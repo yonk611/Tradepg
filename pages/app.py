@@ -52,17 +52,20 @@ try:
     df_clean = df_clean.dropna(subset=['기간'])
     df_clean['기간'] = df_clean['기간'].astype(int)
     
-    # 단위 변환 함수
-    def format_currency_million(value):
-        """천 달러를 백만 달러로 변환"""
-        return value / 1000
-    
-    def format_currency_display(value):
-        """백만 달러 형식으로 표시"""
-        if value >= 1000:
-            return f"${value/1000:.1f}B"
+    # ============ 단위 변환 함수 (직관적 한국식) ============
+    def format_korean_currency(value_thousand_usd):
+        """직관적인 한국식 표기 (천달러 → 조/억)"""
+        if value_thousand_usd >= 1_000_000:  # 1조 이상
+            jo = value_thousand_usd / 1_000_000
+            return f"{jo:.2f}조달러"
+        elif value_thousand_usd >= 10_000:  # 10억 이상
+            eok = value_thousand_usd / 10_000
+            if eok >= 100:
+                return f"{eok:.0f}억달러"
+            else:
+                return f"{eok:.1f}억달러"
         else:
-            return f"${value:.0f}M"
+            return f"{value_thousand_usd:,.0f}천달러"
     
     years = sorted(df_clean['기간'].unique())
     
@@ -74,14 +77,15 @@ try:
     latest_year = years[-1]
     prev_year = years[-2]
     
-    export_latest = format_currency_million(yearly.loc[latest_year, '수출 금액'])
-    import_latest = format_currency_million(yearly.loc[latest_year, '수입 금액'])
-    export_change_pct = ((export_latest - format_currency_million(yearly.loc[prev_year, '수출 금액'])) / 
-                         format_currency_million(yearly.loc[prev_year, '수출 금액'])) * 100
-    import_change_pct = ((import_latest - format_currency_million(yearly.loc[prev_year, '수입 금액'])) / 
-                         format_currency_million(yearly.loc[prev_year, '수입 금액'])) * 100
-    export_change_amount = format_currency_million(yearly.loc[latest_year, '수출 금액'] - yearly.loc[prev_year, '수출 금액'])
-    import_change_amount = format_currency_million(yearly.loc[latest_year, '수입 금액'] - yearly.loc[prev_year, '수입 금액'])
+    export_latest = yearly.loc[latest_year, '수출 금액']
+    import_latest = yearly.loc[latest_year, '수입 금액']
+    export_prev = yearly.loc[prev_year, '수출 금액']
+    import_prev = yearly.loc[prev_year, '수입 금액']
+    
+    export_change_pct = ((export_latest - export_prev) / export_prev) * 100
+    import_change_pct = ((import_latest - import_prev) / import_prev) * 100
+    export_change_amount = export_latest - export_prev
+    import_change_amount = import_latest - import_prev
     
     # 주요 지표 표시
     col1, col2 = st.columns(2)
@@ -89,18 +93,18 @@ try:
     with col1:
         st.markdown(f"""
         <div class="metric-box export-box">
-            <div class="metric-title">✈️ 수출 {format_currency_display(export_latest)}</div>
-            <div class="metric-value">{format_currency_display(export_latest)}</div>
-            <div class="metric-change">전년 동기대비 <span style="font-weight: bold; color: #FFD700;">{export_change_pct:+.1f}%({format_currency_display(export_change_amount)} 증가)</span></div>
+            <div class="metric-title">✈️ 수출 {format_korean_currency(export_latest)}</div>
+            <div class="metric-value">{format_korean_currency(export_latest)}</div>
+            <div class="metric-change">전년 동기대비 <span style="font-weight: bold; color: #FFD700;">{export_change_pct:+.1f}%({format_korean_currency(export_change_amount)} 증가)</span></div>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
         <div class="metric-box import-box">
-            <div class="metric-title">🚢 수입 {format_currency_display(import_latest)}</div>
-            <div class="metric-value">{format_currency_display(import_latest)}</div>
-            <div class="metric-change">전년 동기대비 <span style="font-weight: bold; color: #FFD700;">{import_change_pct:+.1f}%({format_currency_display(import_change_amount)} 증가)</span></div>
+            <div class="metric-title">🚢 수입 {format_korean_currency(import_latest)}</div>
+            <div class="metric-value">{format_korean_currency(import_latest)}</div>
+            <div class="metric-change">전년 동기대비 <span style="font-weight: bold; color: #FFD700;">{import_change_pct:+.1f}%({format_korean_currency(import_change_amount)} 증가)</span></div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -117,16 +121,27 @@ try:
         with col1:
             # 연도별 수출입 금액
             yearly_data = df_clean.groupby('기간')[['수출 금액', '수입 금액']].sum().reset_index()
-            yearly_data['수출 금액(백만)'] = yearly_data['수출 금액'].apply(format_currency_million)
-            yearly_data['수입 금액(백만)'] = yearly_data['수입 금액'].apply(format_currency_million)
+            yearly_data['수출_표시'] = yearly_data['수출 금액'].apply(format_korean_currency)
+            yearly_data['수입_표시'] = yearly_data['수입 금액'].apply(format_korean_currency)
             
-            fig1 = px.bar(yearly_data, x='기간', y=['수출 금액(백만)', '수입 금액(백만)'], 
+            fig1 = px.bar(yearly_data, x='기간', y=['수출 금액', '수입 금액'], 
                          barmode='group',
                          title='연도별 수출/수입 금액',
-                         labels={'기간': '연도', 'value': '금액 (백만 달러)'},
-                         color_discrete_map={'수출 금액(백만)': '#667eea', '수입 금액(백만)': '#f5576c'},
-                         text_auto=',.0f')
-            fig1.update_traces(textposition='outside', hovertemplate='<b>%{x}년</b><br>%{fullData.name}: %{y:,.0f}M<extra></extra>')
+                         labels={'기간': '연도', 'value': '금액'},
+                         color_discrete_map={'수출 금액': '#667eea', '수입 금액': '#f5576c'},
+                         text_auto=False)
+            
+            # 커스텀 텍스트 라벨
+            for i, row in yearly_data.iterrows():
+                fig1.add_annotation(x=row['기간'], y=row['수출 금액'], 
+                                   text=row['수출_표시'], 
+                                   showarrow=False, yshift=10, 
+                                   font=dict(size=11, color='#667eea'), xanchor='center')
+                fig1.add_annotation(x=row['기간'], y=row['수입 금액'], 
+                                   text=row['수입_표시'], 
+                                   showarrow=False, yshift=10, 
+                                   font=dict(size=11, color='#f5576c'), xanchor='center')
+            
             fig1.update_layout(hovermode='x unified', height=400, showlegend=True)
             st.plotly_chart(fig1, use_container_width=True)
         
@@ -134,25 +149,31 @@ try:
             # 무역수지
             yearly_trade = df_clean.groupby('기간')[['수출 금액', '수입 금액']].sum()
             yearly_trade['무역수지'] = yearly_trade['수출 금액'] - yearly_trade['수입 금액']
-            yearly_trade['무역수지(백만)'] = yearly_trade['무역수지'].apply(format_currency_million)
             yearly_trade_reset = yearly_trade.reset_index()
+            yearly_trade_reset['무역수지_표시'] = yearly_trade_reset['무역수지'].apply(format_korean_currency)
             
-            fig2 = px.bar(yearly_trade_reset, x='기간', y='무역수지(백만)',
+            fig2 = px.bar(yearly_trade_reset, x='기간', y='무역수지',
                          title='연도별 무역수지',
-                         labels={'기간': '연도', '무역수지(백만)': '무역수지 (백만 달러)'},
-                         color='무역수지(백만)',
+                         labels={'기간': '연도', '무역수지': '무역수지'},
+                         color='무역수지',
                          color_continuous_scale=['#f5576c', '#FFD700', '#667eea'],
-                         text_auto=',.0f')
-            fig2.update_traces(textposition='outside', hovertemplate='<b>%{x}년</b><br>무역수지: %{y:,.0f}M<extra></extra>')
+                         text_auto=False)
+            
+            for i, row in yearly_trade_reset.iterrows():
+                fig2.add_annotation(x=row['기간'], y=row['무역수지'], 
+                                   text=row['무역수지_표시'], 
+                                   showarrow=False, yshift=10, 
+                                   font=dict(size=11), xanchor='center')
+            
             fig2.update_layout(height=400, showlegend=False)
             st.plotly_chart(fig2, use_container_width=True)
         
         # 연도별 상세 통계
         st.subheader("📊 연도별 상세 통계")
         yearly_detail = df_clean.groupby('기간')[['수출 건수', '수출 금액', '수입 건수', '수입 금액', '무역수지']].sum().reset_index()
-        yearly_detail['수출 금액'] = yearly_detail['수출 금액'].apply(lambda x: f"${format_currency_million(x):,.0f}M")
-        yearly_detail['수입 금액'] = yearly_detail['수입 금액'].apply(lambda x: f"${format_currency_million(x):,.0f}M")
-        yearly_detail['무역수지'] = yearly_detail['무역수지'].apply(lambda x: f"${format_currency_million(x):,.0f}M")
+        yearly_detail['수출 금액'] = yearly_detail['수출 금액'].apply(format_korean_currency)
+        yearly_detail['수입 금액'] = yearly_detail['수입 금액'].apply(format_korean_currency)
+        yearly_detail['무역수지'] = yearly_detail['무역수지'].apply(format_korean_currency)
         
         st.dataframe(yearly_detail.rename(columns={
             '기간': '연도', '수출 건수': '수출 건수', '수출 금액': '수출액',
@@ -172,42 +193,54 @@ try:
         
         country_data = df_clean[df_clean['기간'] == select_year].sort_values('수출 금액', ascending=False)
         country_top = country_data.head(top_n).copy()
-        country_top['수출 금액(백만)'] = country_top['수출 금액'].apply(format_currency_million)
-        country_top['수입 금액(백만)'] = country_top['수입 금액'].apply(format_currency_million)
+        country_top['수출_표시'] = country_top['수출 금액'].apply(format_korean_currency)
+        country_top['수입_표시'] = country_top['수입 금액'].apply(format_korean_currency)
         
         col1, col2 = st.columns(2)
         
         with col1:
-            fig3 = px.bar(country_top, x='국가', y='수출 금액(백만)',
+            fig3 = px.bar(country_top, x='국가', y='수출 금액',
                          title=f'🚀 {select_year}년 주요 수출 대상국 (상위 {top_n}개)',
-                         labels={'국가': '국가', '수출 금액(백만)': '수출액 (백만 달러)'},
-                         color='수출 금액(백만)',
+                         labels={'국가': '국가', '수출 금액': '수출액'},
+                         color='수출 금액',
                          color_continuous_scale='Blues',
-                         text_auto=',.0f')
-            fig3.update_traces(textposition='outside', hovertemplate='<b>%{x}</b><br>수출액: %{y:,.0f}M<extra></extra>')
+                         text_auto=False)
+            
+            for i, row in country_top.iterrows():
+                fig3.add_annotation(x=row['국가'], y=row['수출 금액'], 
+                                   text=row['수출_표시'], 
+                                   showarrow=False, yshift=10, 
+                                   font=dict(size=10), xanchor='center')
+            
             fig3.update_layout(height=400, showlegend=False)
             st.plotly_chart(fig3, use_container_width=True)
         
         with col2:
-            fig4 = px.bar(country_top, x='국가', y='수입 금액(백만)',
+            fig4 = px.bar(country_top, x='국가', y='수입 금액',
                          title=f'⛴️ {select_year}년 주요 수입 원산국 (상위 {top_n}개)',
-                         labels={'국가': '국가', '수입 금액(백만)': '수입액 (백만 달러)'},
-                         color='수입 금액(백만)',
+                         labels={'국가': '국가', '수입 금액': '수입액'},
+                         color='수입 금액',
                          color_continuous_scale='Reds',
-                         text_auto=',.0f')
-            fig4.update_traces(textposition='outside', hovertemplate='<b>%{x}</b><br>수입액: %{y:,.0f}M<extra></extra>')
+                         text_auto=False)
+            
+            for i, row in country_top.iterrows():
+                fig4.add_annotation(x=row['국가'], y=row['수입 금액'], 
+                                   text=row['수입_표시'], 
+                                   showarrow=False, yshift=10, 
+                                   font=dict(size=10), xanchor='center')
+            
             fig4.update_layout(height=400, showlegend=False)
             st.plotly_chart(fig4, use_container_width=True)
         
         # 국가별 상세 데이터
         st.subheader(f"📋 {select_year}년 국가별 상위 {top_n}개국 상세 데이터")
-        country_display = country_top[['국가', '수출 금액(백만)', '수입 금액(백만)', '무역수지', '수출 건수', '수입 건수']].copy()
-        country_display['수출 금액(백만)'] = country_display['수출 금액(백만)'].apply(lambda x: f"${x:,.0f}M")
-        country_display['수입 금액(백만)'] = country_display['수입 금액(백만)'].apply(lambda x: f"${x:,.0f}M")
-        country_display['무역수지'] = country_display['무역수지'].apply(lambda x: f"${format_currency_million(x):,.0f}M")
+        country_display = country_top[['국가', '수출 금액', '수입 금액', '무역수지', '수출 건수', '수입 건수']].copy()
+        country_display['수출 금액'] = country_display['수출 금액'].apply(format_korean_currency)
+        country_display['수입 금액'] = country_display['수입 금액'].apply(format_korean_currency)
+        country_display['무역수지'] = country_display['무역수지'].apply(format_korean_currency)
         
         st.dataframe(country_display.rename(columns={
-            '국가': '국가', '수출 금액(백만)': '수출액', '수입 금액(백만)': '수입액',
+            '국가': '국가', '수출 금액': '수출액', '수입 금액': '수입액',
             '무역수지': '수지', '수출 건수': '수출건수', '수입 건수': '수입건수'
         }), use_container_width=True, hide_index=True)
     
@@ -216,16 +249,15 @@ try:
         
         # 연도별 선 그래프 (추이)
         yearly_line = df_clean.groupby('기간')[['수출 금액', '수입 금액']].sum().reset_index()
-        yearly_line['수출(백만)'] = yearly_line['수출 금액'].apply(format_currency_million)
-        yearly_line['수입(백만)'] = yearly_line['수입 금액'].apply(format_currency_million)
         
-        fig5 = px.line(yearly_line, x='기간', y=['수출(백만)', '수입(백만)'],
+        fig5 = px.line(yearly_line, x='기간', y=['수출 금액', '수입 금액'],
                       title='3년 추이 (수출/수입)',
-                      labels={'기간': '연도', 'value': '금액 (백만 달러)'},
+                      labels={'기간': '연도', 'value': '금액'},
                       markers=True,
-                      color_discrete_map={'수출(백만)': '#667eea', '수입(백만)': '#f5576c'},
+                      color_discrete_map={'수출 금액': '#667eea', '수입 금액': '#f5576c'},
                       line_shape='spline')
-        fig5.update_traces(marker=dict(size=8), hovertemplate='<b>%{x}년</b><br>%{fullData.name}: %{y:,.0f}M<extra></extra>')
+        
+        fig5.update_traces(marker=dict(size=8))
         fig5.update_layout(height=400, hovermode='x unified')
         st.plotly_chart(fig5, use_container_width=True)
         
@@ -240,7 +272,8 @@ try:
         
         for idx, year in enumerate(years):
             if idx == 0:
-                st.write(f"**{year}년**: 기준연도")
+                with col1:
+                    st.metric(f"📍 {year}년", "기준연도", "-")
             else:
                 growth_data = yearly_growth[yearly_growth['기간'] == year].iloc[0]
                 export_growth = growth_data['수출_증감률(%)']
@@ -249,16 +282,18 @@ try:
                 if idx == 1:
                     with col1:
                         st.metric(
-                            f"{year}년 성장률",
+                            f"📊 {year}년",
                             f"수출: {export_growth:+.1f}%",
-                            f"수입: {import_growth:+.1f}%"
+                            f"수입: {import_growth:+.1f}%",
+                            delta_color="off"
                         )
                 elif idx == 2:
                     with col2:
                         st.metric(
-                            f"{year}년 성장률",
+                            f"📊 {year}년",
                             f"수출: {export_growth:+.1f}%",
-                            f"수입: {import_growth:+.1f}%"
+                            f"수입: {import_growth:+.1f}%",
+                            delta_color="off"
                         )
         
         # 국가별 성장률 (최신 2년 비교)
