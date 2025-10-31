@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-st.set_page_config(page_title="수산물 무역 분석", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="수출 수입 확정통계", layout="wide", initial_sidebar_state="collapsed")
 
 # CSS 커스텀 스타일
 st.markdown("""
