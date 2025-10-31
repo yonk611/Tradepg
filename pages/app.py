@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-st.set_page_config(page_title="수출 수입 확정통계", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="수산물 무역 분석", layout="wide", initial_sidebar_state="collapsed")
 
 # CSS 커스텀 스타일
 st.markdown("""
@@ -124,25 +124,74 @@ try:
             yearly_data['수출_표시'] = yearly_data['수출 금액'].apply(format_korean_currency)
             yearly_data['수입_표시'] = yearly_data['수입 금액'].apply(format_korean_currency)
             
-            fig1 = px.bar(yearly_data, x='기간', y=['수출 금액', '수입 금액'], 
-                         barmode='group',
-                         title='연도별 수출/수입 금액',
-                         labels={'기간': '연도', 'value': '금액'},
-                         color_discrete_map={'수출 금액': '#667eea', '수입 금액': '#f5576c'},
-                         text_auto=False)
+            fig1 = go.Figure()
             
-            # 커스텀 텍스트 라벨
-            for i, row in yearly_data.iterrows():
-                fig1.add_annotation(x=row['기간'], y=row['수출 금액'], 
-                                   text=row['수출_표시'], 
-                                   showarrow=False, yshift=10, 
-                                   font=dict(size=11, color='#667eea'), xanchor='center')
-                fig1.add_annotation(x=row['기간'], y=row['수입 금액'], 
-                                   text=row['수입_표시'], 
-                                   showarrow=False, yshift=10, 
-                                   font=dict(size=11, color='#f5576c'), xanchor='center')
+            # 수출 데이터
+            fig1.add_trace(go.Bar(
+                x=yearly_data['기간'],
+                y=yearly_data['수출 금액'],
+                name='수출',
+                marker=dict(
+                    color='#667eea',
+                    cornerradius=8,
+                    line=dict(color='#5567d8', width=0)
+                ),
+                text=yearly_data['수출_표시'],
+                textposition='outside',
+                textfont=dict(size=12, color='#667eea', family='Arial Black'),
+                hovertemplate='<b>%{x}년 수출</b><br>%{customdata}<extra></extra>',
+                customdata=yearly_data['수출_표시']
+            ))
             
-            fig1.update_layout(hovermode='x unified', height=400, showlegend=True)
+            # 수입 데이터
+            fig1.add_trace(go.Bar(
+                x=yearly_data['기간'],
+                y=yearly_data['수입 금액'],
+                name='수입',
+                marker=dict(
+                    color='#f5576c',
+                    cornerradius=8,
+                    line=dict(color='#e04657', width=0)
+                ),
+                text=yearly_data['수입_표시'],
+                textposition='outside',
+                textfont=dict(size=12, color='#f5576c', family='Arial Black'),
+                hovertemplate='<b>%{x}년 수입</b><br>%{customdata}<extra></extra>',
+                customdata=yearly_data['수입_표시']
+            ))
+            
+            fig1.update_layout(
+                title='연도별 수출/수입 금액',
+                barmode='group',
+                height=450,
+                hovermode='x unified',
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family='Arial', size=11),
+                xaxis=dict(
+                    showgrid=False,
+                    zeroline=False,
+                    showline=False,
+                    title=''
+                ),
+                yaxis=dict(
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='rgba(200,200,200,0.2)',
+                    zeroline=False,
+                    showline=False,
+                    title=''
+                ),
+                legend=dict(
+                    orientation='h',
+                    yanchor='bottom',
+                    y=1.02,
+                    xanchor='right',
+                    x=1
+                ),
+                margin=dict(t=50, b=50, l=50, r=50)
+            )
+            
             st.plotly_chart(fig1, use_container_width=True)
         
         with col2:
@@ -151,21 +200,55 @@ try:
             yearly_trade['무역수지'] = yearly_trade['수출 금액'] - yearly_trade['수입 금액']
             yearly_trade_reset = yearly_trade.reset_index()
             yearly_trade_reset['무역수지_표시'] = yearly_trade_reset['무역수지'].apply(format_korean_currency)
+            yearly_trade_reset['색상'] = yearly_trade_reset['무역수지'].apply(
+                lambda x: '#667eea' if x > 0 else '#f5576c'
+            )
             
-            fig2 = px.bar(yearly_trade_reset, x='기간', y='무역수지',
-                         title='연도별 무역수지',
-                         labels={'기간': '연도', '무역수지': '무역수지'},
-                         color='무역수지',
-                         color_continuous_scale=['#f5576c', '#FFD700', '#667eea'],
-                         text_auto=False)
+            fig2 = go.Figure()
             
-            for i, row in yearly_trade_reset.iterrows():
-                fig2.add_annotation(x=row['기간'], y=row['무역수지'], 
-                                   text=row['무역수지_표시'], 
-                                   showarrow=False, yshift=10, 
-                                   font=dict(size=11), xanchor='center')
+            fig2.add_trace(go.Bar(
+                x=yearly_trade_reset['기간'],
+                y=yearly_trade_reset['무역수지'],
+                marker=dict(
+                    color=yearly_trade_reset['색상'],
+                    cornerradius=8,
+                    line=dict(color='rgba(0,0,0,0)', width=0)
+                ),
+                text=yearly_trade_reset['무역수지_표시'],
+                textposition='outside',
+                textfont=dict(size=12, color='#333', family='Arial Black'),
+                hovertemplate='<b>%{x}년 무역수지</b><br>%{customdata}<extra></extra>',
+                customdata=yearly_trade_reset['무역수지_표시']
+            ))
             
-            fig2.update_layout(height=400, showlegend=False)
+            # 0선 추가
+            fig2.add_hline(y=0, line_dash='dash', line_color='#999', opacity=0.5)
+            
+            fig2.update_layout(
+                title='연도별 무역수지',
+                height=450,
+                hovermode='x unified',
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family='Arial', size=11),
+                xaxis=dict(
+                    showgrid=False,
+                    zeroline=False,
+                    showline=False,
+                    title=''
+                ),
+                yaxis=dict(
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='rgba(200,200,200,0.2)',
+                    zeroline=False,
+                    showline=False,
+                    title=''
+                ),
+                showlegend=False,
+                margin=dict(t=50, b=50, l=50, r=50)
+            )
+            
             st.plotly_chart(fig2, use_container_width=True)
         
         # 연도별 상세 통계
@@ -199,37 +282,95 @@ try:
         col1, col2 = st.columns(2)
         
         with col1:
-            fig3 = px.bar(country_top, x='국가', y='수출 금액',
-                         title=f'🚀 {select_year}년 주요 수출 대상국 (상위 {top_n}개)',
-                         labels={'국가': '국가', '수출 금액': '수출액'},
-                         color='수출 금액',
-                         color_continuous_scale='Blues',
-                         text_auto=False)
+            # 수출 차트
+            fig3 = go.Figure()
             
-            for i, row in country_top.iterrows():
-                fig3.add_annotation(x=row['국가'], y=row['수출 금액'], 
-                                   text=row['수출_표시'], 
-                                   showarrow=False, yshift=10, 
-                                   font=dict(size=10), xanchor='center')
+            fig3.add_trace(go.Bar(
+                y=country_top['국가'],
+                x=country_top['수출 금액'],
+                orientation='h',
+                marker=dict(
+                    color=country_top['수출 금액'],
+                    colorscale='Blues',
+                    line=dict(color='rgba(0,0,0,0)'),
+                    cornerradius=5
+                ),
+                text=country_top['수출_표시'],
+                textposition='outside',
+                textfont=dict(size=11, color='#667eea', family='Arial Black'),
+                hovertemplate='<b>%{y}</b><br>수출: %{customdata}<extra></extra>',
+                customdata=country_top['수출_표시']
+            ))
             
-            fig3.update_layout(height=400, showlegend=False)
+            fig3.update_layout(
+                title=f'🚀 {select_year}년 주요 수출 대상국 (상위 {top_n}개)',
+                height=450,
+                hovermode='y unified',
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family='Arial', size=10),
+                xaxis=dict(
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='rgba(200,200,200,0.2)',
+                    zeroline=False,
+                    title=''
+                ),
+                yaxis=dict(
+                    showgrid=False,
+                    zeroline=False,
+                    title=''
+                ),
+                showlegend=False,
+                margin=dict(t=50, b=50, l=100, r=50)
+            )
+            
             st.plotly_chart(fig3, use_container_width=True)
         
         with col2:
-            fig4 = px.bar(country_top, x='국가', y='수입 금액',
-                         title=f'⛴️ {select_year}년 주요 수입 원산국 (상위 {top_n}개)',
-                         labels={'국가': '국가', '수입 금액': '수입액'},
-                         color='수입 금액',
-                         color_continuous_scale='Reds',
-                         text_auto=False)
+            # 수입 차트
+            fig4 = go.Figure()
             
-            for i, row in country_top.iterrows():
-                fig4.add_annotation(x=row['국가'], y=row['수입 금액'], 
-                                   text=row['수입_표시'], 
-                                   showarrow=False, yshift=10, 
-                                   font=dict(size=10), xanchor='center')
+            fig4.add_trace(go.Bar(
+                y=country_top['국가'],
+                x=country_top['수입 금액'],
+                orientation='h',
+                marker=dict(
+                    color=country_top['수입 금액'],
+                    colorscale='Reds',
+                    line=dict(color='rgba(0,0,0,0)'),
+                    cornerradius=5
+                ),
+                text=country_top['수입_표시'],
+                textposition='outside',
+                textfont=dict(size=11, color='#f5576c', family='Arial Black'),
+                hovertemplate='<b>%{y}</b><br>수입: %{customdata}<extra></extra>',
+                customdata=country_top['수입_표시']
+            ))
             
-            fig4.update_layout(height=400, showlegend=False)
+            fig4.update_layout(
+                title=f'⛴️ {select_year}년 주요 수입 원산국 (상위 {top_n}개)',
+                height=450,
+                hovermode='y unified',
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font=dict(family='Arial', size=10),
+                xaxis=dict(
+                    showgrid=True,
+                    gridwidth=1,
+                    gridcolor='rgba(200,200,200,0.2)',
+                    zeroline=False,
+                    title=''
+                ),
+                yaxis=dict(
+                    showgrid=False,
+                    zeroline=False,
+                    title=''
+                ),
+                showlegend=False,
+                margin=dict(t=50, b=50, l=100, r=50)
+            )
+            
             st.plotly_chart(fig4, use_container_width=True)
         
         # 국가별 상세 데이터
@@ -250,15 +391,64 @@ try:
         # 연도별 선 그래프 (추이)
         yearly_line = df_clean.groupby('기간')[['수출 금액', '수입 금액']].sum().reset_index()
         
-        fig5 = px.line(yearly_line, x='기간', y=['수출 금액', '수입 금액'],
-                      title='3년 추이 (수출/수입)',
-                      labels={'기간': '연도', 'value': '금액'},
-                      markers=True,
-                      color_discrete_map={'수출 금액': '#667eea', '수입 금액': '#f5576c'},
-                      line_shape='spline')
+        fig5 = go.Figure()
         
-        fig5.update_traces(marker=dict(size=8))
-        fig5.update_layout(height=400, hovermode='x unified')
+        fig5.add_trace(go.Scatter(
+            x=yearly_line['기간'],
+            y=yearly_line['수출 금액'],
+            mode='lines+markers',
+            name='수출',
+            line=dict(color='#667eea', width=4, shape='spline'),
+            marker=dict(size=12, symbol='circle', line=dict(color='white', width=2)),
+            fill=None,
+            hovertemplate='<b>%{x}년 수출</b><br>%{customdata}<extra></extra>',
+            customdata=[format_korean_currency(v) for v in yearly_line['수출 금액']]
+        ))
+        
+        fig5.add_trace(go.Scatter(
+            x=yearly_line['기간'],
+            y=yearly_line['수입 금액'],
+            mode='lines+markers',
+            name='수입',
+            line=dict(color='#f5576c', width=4, shape='spline'),
+            marker=dict(size=12, symbol='circle', line=dict(color='white', width=2)),
+            fill=None,
+            hovertemplate='<b>%{x}년 수입</b><br>%{customdata}<extra></extra>',
+            customdata=[format_korean_currency(v) for v in yearly_line['수입 금액']]
+        ))
+        
+        fig5.update_layout(
+            title='3년 추이 (수출/수입)',
+            height=450,
+            hovermode='x unified',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(family='Arial', size=11),
+            xaxis=dict(
+                showgrid=False,
+                zeroline=False,
+                showline=False,
+                title='',
+                dtick=1
+            ),
+            yaxis=dict(
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='rgba(200,200,200,0.2)',
+                zeroline=False,
+                showline=False,
+                title=''
+            ),
+            legend=dict(
+                orientation='h',
+                yanchor='bottom',
+                y=1.02,
+                xanchor='right',
+                x=1
+            ),
+            margin=dict(t=50, b=50, l=50, r=50)
+        )
+        
         st.plotly_chart(fig5, use_container_width=True)
         
         # 성장률 비교
@@ -312,16 +502,52 @@ try:
             country_growth_comp.head(top_growth),
             country_growth_comp.tail(top_growth)
         ]).sort_values('성장률(%)')
+        growth_display['색상'] = growth_display['성장률(%)'].apply(
+            lambda x: '#667eea' if x > 0 else '#f5576c'
+        )
         
-        fig6 = px.bar(growth_display, x='성장률(%)', y='국가',
-                     title=f'{prev_year}년 대비 {latest_year}년 국가별 수출 성장률 (상위/하위)',
-                     labels={'성장률(%)': '성장률 (%)', '국가': '국가'},
-                     orientation='h',
-                     color='성장률(%)',
-                     color_continuous_scale=['#f5576c', '#FFD700', '#667eea'],
-                     text_auto=',.1f')
-        fig6.update_traces(textposition='outside', hovertemplate='<b>%{y}</b><br>성장률: %{x:+.1f}%<extra></extra>')
-        fig6.update_layout(height=600, showlegend=False)
+        fig6 = go.Figure()
+        
+        fig6.add_trace(go.Bar(
+            y=growth_display['국가'],
+            x=growth_display['성장률(%)'],
+            orientation='h',
+            marker=dict(
+                color=growth_display['색상'],
+                line=dict(color='rgba(0,0,0,0)'),
+                cornerradius=5
+            ),
+            text=growth_display['성장률(%)'].apply(lambda x: f'{x:+.1f}%'),
+            textposition='outside',
+            textfont=dict(size=11, family='Arial Black'),
+            hovertemplate='<b>%{y}</b><br>성장률: %{x:+.1f}%<extra></extra>'
+        ))
+        
+        fig6.add_vline(x=0, line_dash='dash', line_color='#999', opacity=0.5)
+        
+        fig6.update_layout(
+            title=f'{prev_year}년 대비 {latest_year}년 국가별 수출 성장률 (상위/하위)',
+            height=550,
+            hovermode='y unified',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(family='Arial', size=10),
+            xaxis=dict(
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='rgba(200,200,200,0.2)',
+                zeroline=False,
+                title=''
+            ),
+            yaxis=dict(
+                showgrid=False,
+                zeroline=False,
+                title=''
+            ),
+            showlegend=False,
+            margin=dict(t=50, b=50, l=100, r=50)
+        )
+        
         st.plotly_chart(fig6, use_container_width=True)
 
 except FileNotFoundError:
